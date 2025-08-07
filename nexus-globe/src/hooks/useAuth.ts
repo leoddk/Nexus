@@ -10,6 +10,8 @@ export const useAuth = () => {
 
   const fetchProfile = useCallback(async (userId: string, userEmail: string | undefined) => {
     try {
+      console.log('Fetching profile for user:', userId); // Debug log
+      
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -17,7 +19,8 @@ export const useAuth = () => {
         .single();
 
       if (error && error.code === 'PGRST116') {
-        // Profile doesn't exist, create one
+        console.log('Profile not found, creating new profile'); // Debug log
+        
         const { data: newProfile, error: createError } = await supabase
           .from('profiles')
           .insert({ id: userId, email: userEmail, role: 'viewer' })
@@ -30,11 +33,11 @@ export const useAuth = () => {
         }
         
         setProfile(newProfile);
-
       } else if (error) {
         console.error("Failed to fetch profile:", error);
         throw error;
       } else {
+        console.log('Profile fetched successfully:', data); // Debug log
         setProfile(data);
       }
     } catch (error) {
@@ -44,25 +47,37 @@ export const useAuth = () => {
   }, []);
 
   useEffect(() => {
+    console.log('useAuth effect triggered'); // Debug log
     setLoading(true);
-    
+
     const checkSession = async () => {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession();
+        console.log('Checking session...'); // Debug log
         
+        const { data: { session }, error } = await supabase.auth.getSession();
+
         if (error) {
           console.error('Session check error:', error);
+          setUser(null);
+          setProfile(null);
           return;
         }
+
+        console.log('Session check result:', session ? 'Session found' : 'No session'); // Debug log
         
         setUser(session?.user ?? null);
-        
+
         if (session?.user) {
           await fetchProfile(session.user.id, session.user.email);
+        } else {
+          setProfile(null);
         }
       } catch (error) {
         console.error('Error checking session:', error);
+        setUser(null);
+        setProfile(null);
       } finally {
+        console.log('Setting loading to false'); // Debug log
         setLoading(false);
       }
     };
@@ -71,25 +86,38 @@ export const useAuth = () => {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        setLoading(true);
-        setUser(session?.user ?? null);
+        console.log('Auth state change:', event, session ? 'Session exists' : 'No session'); // Debug log
         
-        if (session?.user) {
-          await fetchProfile(session.user.id, session.user.email);
-        } else {
-          setProfile(null);
+        setLoading(true);
+        
+        try {
+          setUser(session?.user ?? null);
+
+          if (session?.user) {
+            await fetchProfile(session.user.id, session.user.email);
+          } else {
+            setProfile(null);
+          }
+        } catch (error) {
+          console.error('Error in auth state change:', error);
+        } finally {
+          setLoading(false);
         }
-        setLoading(false);
       }
     );
 
     return () => {
+      console.log('Cleaning up auth subscription'); // Debug log
       subscription.unsubscribe();
     };
   }, [fetchProfile]);
 
-  const signIn = (email: string, password: string) => supabase.auth.signInWithPassword({ email, password });
-  const signUp = (email: string, password: string) => supabase.auth.signUp({ email, password });
+  const signIn = (email: string, password: string) => 
+    supabase.auth.signInWithPassword({ email, password });
+
+  const signUp = (email: string, password: string) => 
+    supabase.auth.signUp({ email, password });
+
   const signOut = () => supabase.auth.signOut();
 
   const isAdmin = profile?.role === 'admin';
