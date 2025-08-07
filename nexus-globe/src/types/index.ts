@@ -16,8 +16,3 @@ export interface Profile {
   role: 'admin' | 'viewer';
   created_at: string;
 }
-
-export interface User {
-  id: string;
-  email?: string;
-}

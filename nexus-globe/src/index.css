@@ -9,11 +9,5 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-}
-
-.cesium-viewer-toolbar,
-.cesium-viewer-animationContainer,
-.cesium-viewer-timelineContainer,
-.cesium-viewer-bottom {
-  display: none !important;
+  background-color: #0f172a; /* bg-slate-900 */
 }
