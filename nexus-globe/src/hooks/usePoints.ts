@@ -7,19 +7,24 @@ export const usePoints = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchPoints = async () => {
+  const fetchPoints = async (showLoading = false) => {
     try {
-      setLoading(true);
+      if (showLoading) {
+        setLoading(true);
+      }
       const { data, error } = await supabase
         .from('nexus_points')
         .select('*')
         .order('created_at', { ascending: false });
+
       if (error) throw error;
       setPoints(data || []);
     } catch (err: any) {
       setError(err.message);
     } finally {
-      setLoading(false);
+      if (showLoading) {
+        setLoading(false);
+      }
     }
   };
 
@@ -50,16 +55,32 @@ export const usePoints = () => {
   };
 
   useEffect(() => {
-    fetchPoints();
+    let mounted = true;
+
+    const initializePoints = async () => {
+      if (mounted) {
+        await fetchPoints(true); // Show loading only on initial fetch
+        if (mounted) {
+          setLoading(false); // Ensure loading is set to false after initial load
+        }
+      }
+    };
+
+    initializePoints();
+
     const channel = supabase.channel('nexus_points_channel');
     const subscription = channel
       .on('postgres_changes', { event: '*', schema: 'public', table: 'nexus_points' },
         (payload) => {
-          fetchPoints(); // Simple refetch on any change
+          if (mounted) {
+            fetchPoints(false); // Don't show loading on real-time updates
+          }
         }
       )
       .subscribe();
+
     return () => {
+      mounted = false;
       subscription.unsubscribe();
     };
   }, []);
