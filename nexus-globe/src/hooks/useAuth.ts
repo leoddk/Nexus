@@ -112,15 +112,13 @@ export const useAuth = () => {
     // Handle visibility change (tab focus/blur)
     const handleVisibilityChange = () => {
       if (!document.hidden && mounted) {
-        // Tab became visible again - refresh auth state if we have a user
-        if (user) {
-          supabase.auth.getSession().then(({ data: { session }, error }) => {
-            if (mounted && !error && session?.user) {
-              setUser(session.user);
-              fetchProfile(session.user.id, session.user.email);
-            }
-          });
-        }
+        // Tab became visible again - refresh auth state
+        supabase.auth.getSession().then(({ data: { session }, error }) => {
+          if (mounted && !error && session?.user) {
+            setUser(session.user);
+            fetchProfile(session.user.id, session.user.email);
+          }
+        });
       }
     };
 
@@ -132,7 +130,7 @@ export const useAuth = () => {
       subscription.unsubscribe();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [fetchProfile]);
+  }, [fetchProfile]); // Removed 'user' dependency since we don't need it
 
   const signIn = (email: string, password: string) => 
     supabase.auth.signInWithPassword({ email, password });
