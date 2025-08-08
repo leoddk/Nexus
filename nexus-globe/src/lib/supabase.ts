@@ -11,4 +11,8 @@ if (!supabaseAnonKey) {
   throw new Error('Missing REACT_APP_SUPABASE_ANON_KEY environment variable');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    detectSessionInUrl: false,
+  },
+});

@@ -49,38 +49,42 @@ export const useAuth = () => {
   useEffect(() => {
     let mounted = true;
     console.log('useAuth effect triggered');
-
+    
+    // REMOVED: setLoading(true); - This was causing issues
+    
     const checkSession = async () => {
       try {
         console.log('Checking session...');
         
-        const { data: { session }, error } = await supabase.auth.getSession();
+        const { data, error } = await supabase.auth.getSession();
         if (error) {
           console.error('Session check error:', error);
           if (mounted) {
             setUser(null);
             setProfile(null);
-            setLoading(false);
           }
           return;
         }
 
-        console.log('Session check result:', session ? 'Session found' : 'No session');
+        console.log('Session check result:', data.session ? 'Session found' : 'No session');
         
         if (mounted) {
-          setUser(session?.user ?? null);
-          if (session?.user) {
-            await fetchProfile(session.user.id, session.user.email);
+          setUser(data.session?.user ?? null);
+          if (data.session?.user) {
+            await fetchProfile(data.session.user.id, data.session.user.email);
           } else {
             setProfile(null);
           }
-          setLoading(false);
         }
       } catch (error) {
         console.error('Error checking session:', error);
         if (mounted) {
           setUser(null);
           setProfile(null);
+        }
+      } finally {
+        console.log('Setting loading to false');
+        if (mounted) {
           setLoading(false);
         }
       }
@@ -92,6 +96,8 @@ export const useAuth = () => {
       async (event, session) => {
         console.log('Auth state change:', event, session ? 'Session exists' : 'No session');
         
+        // REMOVED: setLoading(true); - This was the main culprit causing loading screen on refresh
+        
         if (mounted) {
           try {
             setUser(session?.user ?? null);
@@ -102,35 +108,18 @@ export const useAuth = () => {
             }
           } catch (error) {
             console.error('Error in auth state change:', error);
-          } finally {
-            setLoading(false);
           }
+          // REMOVED: finally block that sets loading to false
         }
       }
     );
-
-    // Handle visibility change (tab focus/blur)
-    const handleVisibilityChange = () => {
-      if (!document.hidden && mounted) {
-        // Tab became visible again - refresh auth state
-        supabase.auth.getSession().then(({ data: { session }, error }) => {
-          if (mounted && !error && session?.user) {
-            setUser(session.user);
-            fetchProfile(session.user.id, session.user.email);
-          }
-        });
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       mounted = false;
       console.log('Cleaning up auth subscription');
       subscription.unsubscribe();
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [fetchProfile]); // Removed 'user' dependency since we don't need it
+  }, [fetchProfile]);
 
   const signIn = (email: string, password: string) => 
     supabase.auth.signInWithPassword({ email, password });
