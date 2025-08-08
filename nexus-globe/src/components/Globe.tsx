@@ -40,6 +40,7 @@ const GlobeComponent: React.FC<GlobeProps> = ({ points, onPointClick, selectedPo
     return () => resizeObserver.disconnect();
   }, []);
 
+  // Updated useEffect to properly initialize and control auto-rotation
   useEffect(() => {
     if (globeEl.current) {
       const controls = globeEl.current.controls();
@@ -48,7 +49,22 @@ const GlobeComponent: React.FC<GlobeProps> = ({ points, onPointClick, selectedPo
       controls.enableDamping = true;
       controls.dampingFactor = 0.1;
     }
-  }, [selectedPoint, isAutoRotating]);
+  }, [selectedPoint, isAutoRotating, dimensions.width]); // Added dimensions.width to ensure it runs after globe is ready
+
+  // Additional useEffect to ensure rotation starts when globe is first loaded
+  useEffect(() => {
+    if (globeEl.current && dimensions.width > 0 && !selectedPoint) {
+      const timer = setTimeout(() => {
+        const controls = globeEl.current.controls();
+        controls.autoRotate = isAutoRotating;
+        controls.autoRotateSpeed = 0.3;
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.1;
+      }, 100); // Small delay to ensure globe is fully initialized
+      
+      return () => clearTimeout(timer);
+    }
+  }, [dimensions.width, isAutoRotating]); // Runs when globe dimensions are set
 
   const handlePointClick = (point: any) => {
     onPointClick?.(point as NexusPoint);
