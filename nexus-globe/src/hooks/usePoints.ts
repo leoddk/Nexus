@@ -16,7 +16,7 @@ export const usePoints = () => {
         .from('nexus_points')
         .select('*')
         .order('created_at', { ascending: false });
-
+      
       if (error) throw error;
       setPoints(data || []);
     } catch (err: any) {
@@ -29,7 +29,12 @@ export const usePoints = () => {
   };
 
   const addPoint = async (point: Omit<NexusPoint, 'id' | 'created_at' | 'updated_at'>) => {
-    const { data, error } = await supabase.from('nexus_points').insert(point).select().single();
+    const { data, error } = await supabase
+      .from('nexus_points')
+      .insert(point)
+      .select()
+      .single();
+    
     if (error) throw error;
     setPoints(prev => [data, ...prev]);
     return { data, error: null };
@@ -42,13 +47,18 @@ export const usePoints = () => {
       .eq('id', id)
       .select()
       .single();
+    
     if (error) throw error;
     setPoints(prev => prev.map(p => p.id === id ? data : p));
     return { data, error: null };
   };
 
   const deletePoint = async (id: string) => {
-    const { error } = await supabase.from('nexus_points').delete().eq('id', id);
+    const { error } = await supabase
+      .from('nexus_points')
+      .delete()
+      .eq('id', id);
+    
     if (error) throw error;
     setPoints(prev => prev.filter(p => p.id !== id));
     return { error: null };
@@ -56,12 +66,12 @@ export const usePoints = () => {
 
   useEffect(() => {
     let mounted = true;
-
+    
     const initializePoints = async () => {
       if (mounted) {
-        await fetchPoints(true); // Show loading only on initial fetch
+        await fetchPoints(true);
         if (mounted) {
-          setLoading(false); // Ensure loading is set to false after initial load
+          setLoading(false);
         }
       }
     };
@@ -70,18 +80,22 @@ export const usePoints = () => {
 
     const channel = supabase.channel('nexus_points_channel');
     const subscription = channel
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'nexus_points' },
-        (payload) => {
-          if (mounted) {
-            fetchPoints(false); // Don't show loading on real-time updates
-          }
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'nexus_points' 
+      }, (payload) => {
+        if (mounted) {
+          fetchPoints(false);
         }
-      )
+      })
       .subscribe();
 
     return () => {
       mounted = false;
-      subscription.unsubscribe();
+      if (subscription) {
+        subscription.unsubscribe();
+      }
     };
   }, []);
 

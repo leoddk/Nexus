@@ -11,8 +11,7 @@ const App: React.FC = () => {
   const { points, loading: pointsLoading, error: pointsError } = usePoints();
   const [selectedPoint, setSelectedPoint] = useState<NexusPoint | null>(null);
 
-  // Only show loading screen during the initial authentication check
-  // Remove the loading screen check entirely - let the auth state determine what to show
+  // Show auth screen if no user and auth is not loading
   if (!user && !authLoading) {
     return <Auth />;
   }
