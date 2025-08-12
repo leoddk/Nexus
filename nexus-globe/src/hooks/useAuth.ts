@@ -48,42 +48,33 @@ export const useAuth = () => {
 
   useEffect(() => {
     let mounted = true;
-    console.log('useAuth effect triggered');
-    
-    // REMOVED: setLoading(true); - This was causing issues
-    
+
     const checkSession = async () => {
+      // Only check session if tab is focused
+      if (!document.hasFocus()) {
+        setLoading(false);
+        return;
+      }
+
       try {
         console.log('Checking session...');
-        
         const { data, error } = await supabase.auth.getSession();
+        
         if (error) {
-          console.error('Session check error:', error);
-          if (mounted) {
-            setUser(null);
-            setProfile(null);
-          }
+          console.error('Error getting session:', error);
+          setLoading(false);
           return;
         }
 
-        console.log('Session check result:', data.session ? 'Session found' : 'No session');
-        
         if (mounted) {
-          setUser(data.session?.user ?? null);
           if (data.session?.user) {
+            setUser(data.session.user);
             await fetchProfile(data.session.user.id, data.session.user.email);
-          } else {
-            setProfile(null);
           }
+          setLoading(false);
         }
       } catch (error) {
-        console.error('Error checking session:', error);
-        if (mounted) {
-          setUser(null);
-          setProfile(null);
-        }
-      } finally {
-        console.log('Setting loading to false');
+        console.error('Error in checkSession:', error);
         if (mounted) {
           setLoading(false);
         }
@@ -94,9 +85,10 @@ export const useAuth = () => {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth state change:', event, session ? 'Session exists' : 'No session');
+        // Only process auth changes if this tab is focused
+        if (!document.hasFocus()) return;
         
-        // REMOVED: setLoading(true); - This was the main culprit causing loading screen on refresh
+        console.log('Auth state change:', event, session ? 'Session exists' : 'No session');
         
         if (mounted) {
           try {
@@ -109,7 +101,6 @@ export const useAuth = () => {
           } catch (error) {
             console.error('Error in auth state change:', error);
           }
-          // REMOVED: finally block that sets loading to false
         }
       }
     );
@@ -121,15 +112,35 @@ export const useAuth = () => {
     };
   }, [fetchProfile]);
 
-  const signIn = (email: string, password: string) => 
-    supabase.auth.signInWithPassword({ email, password });
+  // Add the missing signIn and signUp functions
+  const signIn = async (email: string, password: string) => {
+    return await supabase.auth.signInWithPassword({ email, password });
+  };
 
-  const signUp = (email: string, password: string) => 
-    supabase.auth.signUp({ email, password });
+  const signUp = async (email: string, password: string) => {
+    return await supabase.auth.signUp({ email, password });
+  };
 
-  const signOut = () => supabase.auth.signOut();
+  const signOut = async () => {
+    try {
+      await supabase.auth.signOut();
+      setUser(null);
+      setProfile(null);
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
 
   const isAdmin = profile?.role === 'admin';
 
-  return { user, profile, loading, isAdmin, signIn, signUp, signOut };
+  // Add signIn and signUp to the return statement
+  return { 
+    user, 
+    profile, 
+    loading, 
+    isAdmin, 
+    signIn, 
+    signUp, 
+    signOut 
+  };
 };
