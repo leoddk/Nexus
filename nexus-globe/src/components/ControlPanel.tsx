@@ -24,10 +24,11 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ points, selectedPoint, onPo
     status: 'green' as 'green' | 'yellow' | 'red' 
   });
 
-  const statusCounts = points.reduce((acc, point) => { 
+  const statusCounts = useMemo(() => points.reduce((acc, point) => { 
     acc[point.status]++; 
+    acc.total++;
     return acc; 
-  }, { green: 0, yellow: 0, red: 0 });
+  }, { green: 0, yellow: 0, red: 0, total: 0 }), [points]);
 
   const filteredPoints = useMemo(() => {
     if (!searchTerm.trim()) return points;
@@ -111,7 +112,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ points, selectedPoint, onPo
         </div>
       </button>
 
-      <div className={`absolute top-20 right-4 w-72 md:w-80 bg-white rounded-lg shadow-lg z-10 max-h-[calc(100vh-6rem)] overflow-y-auto transform transition-transform duration-300 ease-in-out ${
+      <div className={`absolute top-20 right-4 w-72 md:w-80 bg-white rounded-lg shadow-lg z-10 max-h-[calc(100vh-12rem)] overflow-y-auto transform transition-transform duration-300 ease-in-out ${
         isPanelOpen ? 'translate-x-0' : 'translate-x-[120%]'
       }`}>
         <div className="p-3 md:p-4 border-b border-gray-200">

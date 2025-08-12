@@ -1,76 +1,88 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
-import { NexusPoint } from '../types';
+import { useState, useEffect, useCallback } from 'react';
+import { NexusPoint, StatusCount } from '../types';
+import { PointsService } from '../services/pointsService';
 
 export const usePoints = () => {
   const [points, setPoints] = useState<NexusPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchPoints = async (showLoading = false) => {
+  const fetchPoints = useCallback(async (showLoading = false) => {
     try {
       if (showLoading) {
         setLoading(true);
       }
-      const { data, error } = await supabase
-        .from('nexus_points')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      setPoints(data || []);
+      setError(null);
+      const data = await PointsService.fetchPoints();
+      setPoints(data);
     } catch (err: any) {
       setError(err.message);
+      console.error('Error fetching points:', err);
     } finally {
       if (showLoading) {
         setLoading(false);
       }
     }
-  };
+  }, []);
 
   const addPoint = async (point: Omit<NexusPoint, 'id' | 'created_at' | 'updated_at'>) => {
-    const { data, error } = await supabase
-      .from('nexus_points')
-      .insert(point)
-      .select()
-      .single();
-    
-    if (error) throw error;
-    setPoints(prev => [data, ...prev]);
-    return { data, error: null };
+    try {
+      const newPoint = await PointsService.addPoint(point);
+      setPoints(prev => [newPoint, ...prev]);
+      return { data: newPoint, error: null };
+    } catch (error: any) {
+      console.error('Error adding point:', error);
+      return { data: null, error };
+    }
   };
 
   const updatePoint = async (id: string, updates: Partial<NexusPoint>) => {
-    const { data, error } = await supabase
-      .from('nexus_points')
-      .update({ ...updates, updated_at: new Date().toISOString() })
-      .eq('id', id)
-      .select()
-      .single();
-    
-    if (error) throw error;
-    setPoints(prev => prev.map(p => p.id === id ? data : p));
-    return { data, error: null };
+    try {
+      const updatedPoint = await PointsService.updatePoint(id, updates);
+      setPoints(prev => prev.map(p => p.id === id ? updatedPoint : p));
+      // Force a refresh to ensure the UI is updated
+      await fetchPoints(false);
+      return { data: updatedPoint, error: null };
+    } catch (error: any) {
+      console.error('Error updating point:', error);
+      return { data: null, error };
+    }
   };
 
   const deletePoint = async (id: string) => {
-    const { error } = await supabase
-      .from('nexus_points')
-      .delete()
-      .eq('id', id);
-    
-    if (error) throw error;
-    setPoints(prev => prev.filter(p => p.id !== id));
-    return { error: null };
+    try {
+      await PointsService.deletePoint(id);
+      setPoints(prev => prev.filter(p => p.id !== id));
+      return { error: null };
+    } catch (error: any) {
+      console.error('Error deleting point:', error);
+      return { error };
+    }
   };
+
+  const getStatusCounts = useCallback((): StatusCount => {
+    const counts = points.reduce((acc, point) => {
+      acc[point.status]++;
+      acc.total++;
+      return acc;
+    }, { green: 0, yellow: 0, red: 0, total: 0 });
+    
+    return counts;
+  }, [points]);
 
   useEffect(() => {
     let mounted = true;
     
     const initializePoints = async () => {
-      if (mounted) {
-        await fetchPoints(true);
+      try {
         if (mounted) {
+          setLoading(true);
+          setError(null);
+          await fetchPoints(true);
+        }
+      } catch (err: any) {
+        if (mounted) {
+          setError(err.message);
           setLoading(false);
         }
       }
@@ -78,26 +90,26 @@ export const usePoints = () => {
 
     initializePoints();
 
-    const channel = supabase.channel('nexus_points_channel');
-    const subscription = channel
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'nexus_points' 
-      }, (payload) => {
-        if (mounted) {
-          fetchPoints(false);
-        }
-      })
-      .subscribe();
+    const unsubscribe = PointsService.subscribeToChanges(() => {
+      if (mounted) {
+        fetchPoints(false);
+      }
+    });
 
     return () => {
       mounted = false;
-      if (subscription) {
-        subscription.unsubscribe();
-      }
+      unsubscribe();
     };
-  }, []);
+  }, [fetchPoints]);
 
-  return { points, loading, error, addPoint, updatePoint, deletePoint };
+  return { 
+    points, 
+    loading, 
+    error, 
+    addPoint, 
+    updatePoint, 
+    deletePoint, 
+    getStatusCounts,
+    refetch: () => fetchPoints(true)
+  };
 };

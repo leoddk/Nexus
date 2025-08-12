@@ -11,17 +11,22 @@ const App: React.FC = () => {
   const { points, loading: pointsLoading, error: pointsError } = usePoints();
   const [selectedPoint, setSelectedPoint] = useState<NexusPoint | null>(null);
 
-  // Show auth screen if no user and auth is not loading
-  if (!user && !authLoading) {
-    return <Auth />;
+  // Show loading if auth is still loading
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white">
+        <div className="text-center">
+          <div className="text-xl mb-2">Loading Authentication...</div>
+          <div className="text-sm text-gray-400">Connecting to Supabase...</div>
+          <div className="mt-4">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400 mx-auto"></div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
-  // Show loading only if we're still checking auth AND don't have a user yet
-  if (authLoading && !user) {
-    return <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white">Loading Authentication...</div>;
-  }
-
-  // If we don't have a user and we're not loading, show auth
+  // Show auth screen if no user
   if (!user) {
     return <Auth />;
   }

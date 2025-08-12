@@ -17,9 +17,10 @@ const GlobeComponent: React.FC<GlobeProps> = ({ points, onPointClick, selectedPo
     ...point,
     lat: point.latitude,
     lng: point.longitude,
-    size: selectedPoint?.id === point.id ? 0.8 : 0.4,
-    color: point.status === 'green' ? '#22c55e' :
-           point.status === 'yellow' ? '#eab308' : '#ef4444'
+    size: selectedPoint?.id === point.id ? 1.2 : 0.6,
+    color: point.status === 'green' ? '#10b981' :
+           point.status === 'yellow' ? '#f59e0b' : '#ef4444',
+    opacity: selectedPoint?.id === point.id ? 1.0 : 0.8
   })), [points, selectedPoint]);
 
   useEffect(() => {

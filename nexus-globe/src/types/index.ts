@@ -16,3 +16,24 @@ export interface Profile {
   role: 'admin' | 'viewer';
   created_at: string;
 }
+
+export interface MilitaryHub extends NexusPoint {
+  type: 'air-base' | 'naval-base' | 'army-base' | 'space-command' | 'intelligence' | 'early-warning' | 'strategic';
+  country: string;
+  branch?: 'air-force' | 'navy' | 'army' | 'marines' | 'space-force' | 'joint' | 'nato';
+  classification: 'public' | 'restricted' | 'classified';
+}
+
+export interface StatusCount {
+  green: number;
+  yellow: number;
+  red: number;
+  total: number;
+}
+
+export interface GlobeSettings {
+  autoRotate: boolean;
+  showLabels: boolean;
+  showPaths: boolean;
+  nightMode: boolean;
+}
