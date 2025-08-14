@@ -72,23 +72,85 @@ export class PointsService {
 
   static subscribeToChanges(callback: () => void) {
     console.log('Setting up real-time subscription for nexus_points');
-    const channel = supabase
-      .channel('nexus_points_changes')
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'nexus_points' 
-      }, (payload) => {
-        console.log('Real-time update received:', payload);
+    let timeoutId: NodeJS.Timeout | null = null;
+    let isSubscribed = false;
+    
+    const debouncedCallback = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        console.log('Executing callback after real-time update');
         callback();
-      })
-      .subscribe((status) => {
-        console.log('Subscription status:', status);
-      });
+      }, 100);
+    };
+    
+    // Wait for authentication before subscribing
+    const setupSubscription = async () => {
+      try {
+        // Check if user is authenticated
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          console.log('No session found, waiting for authentication...');
+          return;
+        }
+        
+        console.log('User authenticated, setting up real-time subscription');
+        
+        const channel = supabase
+          .channel('nexus_points_changes', {
+            config: {
+              broadcast: { self: false }
+            }
+          })
+          .on('postgres_changes', { 
+            event: '*', 
+            schema: 'public', 
+            table: 'nexus_points' 
+          }, (payload) => {
+            console.log('Real-time update received:', {
+              eventType: payload.eventType,
+              table: payload.table,
+              recordId: (payload.new as any)?.id || (payload.old as any)?.id,
+              timestamp: new Date().toISOString()
+            });
+            debouncedCallback();
+          })
+          .subscribe((status) => {
+            console.log('Real-time subscription status:', status);
+            if (status === 'SUBSCRIBED') {
+              console.log('✅ Successfully subscribed to nexus_points changes');
+              isSubscribed = true;
+            } else if (status === 'CHANNEL_ERROR') {
+              console.error('❌ Error in real-time subscription');
+              isSubscribed = false;
+            } else if (status === 'TIMED_OUT') {
+              console.error('⏰ Real-time subscription timed out');
+              isSubscribed = false;
+            } else if (status === 'CLOSED') {
+              console.log('🔒 Real-time subscription closed');
+              isSubscribed = false;
+            }
+          });
+
+        return channel;
+      } catch (error) {
+        console.error('Error setting up real-time subscription:', error);
+        return null;
+      }
+    };
+
+    let channel: any = null;
+    
+    // Setup subscription after a short delay to ensure auth is ready
+    setTimeout(async () => {
+      channel = await setupSubscription();
+    }, 1000);
 
     return () => {
       console.log('Unsubscribing from real-time updates');
-      channel.unsubscribe();
+      if (timeoutId) clearTimeout(timeoutId);
+      if (channel && isSubscribed) {
+        channel.unsubscribe();
+      }
     };
   }
 }

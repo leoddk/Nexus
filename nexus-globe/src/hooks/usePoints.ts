@@ -13,7 +13,9 @@ export const usePoints = () => {
         setLoading(true);
       }
       setError(null);
+      console.log('Fetching points from database...');
       const data = await PointsService.fetchPoints();
+      console.log('Fetched points:', data.length, 'points');
       setPoints(data);
     } catch (err: any) {
       setError(err.message);
@@ -39,12 +41,23 @@ export const usePoints = () => {
   const updatePoint = async (id: string, updates: Partial<NexusPoint>) => {
     try {
       const updatedPoint = await PointsService.updatePoint(id, updates);
-      setPoints(prev => prev.map(p => p.id === id ? updatedPoint : p));
-      // Force a refresh to ensure the UI is updated
-      await fetchPoints(false);
+      // Update local state immediately for better UX
+      setPoints(prev => {
+        console.log('Updating local state for point:', id, 'with updates:', updates);
+        const newPoints = [...prev]; // Create a new array
+        const index = newPoints.findIndex(p => p.id === id);
+        if (index !== -1) {
+          newPoints[index] = { ...updatedPoint }; // Create a new object
+        }
+        console.log('New points state after update:', newPoints.find(p => p.id === id));
+        return newPoints;
+      });
+      
       return { data: updatedPoint, error: null };
     } catch (error: any) {
       console.error('Error updating point:', error);
+      // On error, refetch to ensure consistency
+      await fetchPoints(false);
       return { data: null, error };
     }
   };
@@ -72,13 +85,26 @@ export const usePoints = () => {
 
   useEffect(() => {
     let mounted = true;
+    let unsubscribe: (() => void) | null = null;
     
     const initializePoints = async () => {
       try {
         if (mounted) {
           setLoading(true);
           setError(null);
+          console.log('🔄 Initializing points data...');
           await fetchPoints(true);
+          
+          // Set up real-time subscription after initial data load
+          if (mounted) {
+            console.log('🔗 Setting up real-time subscription...');
+            unsubscribe = PointsService.subscribeToChanges(() => {
+              if (mounted) {
+                console.log('📡 Real-time callback triggered, refetching points...');
+                fetchPoints(false);
+              }
+            });
+          }
         }
       } catch (err: any) {
         if (mounted) {
@@ -90,15 +116,12 @@ export const usePoints = () => {
 
     initializePoints();
 
-    const unsubscribe = PointsService.subscribeToChanges(() => {
-      if (mounted) {
-        fetchPoints(false);
-      }
-    });
-
     return () => {
+      console.log('🧹 Cleaning up usePoints hook...');
       mounted = false;
-      unsubscribe();
+      if (unsubscribe) {
+        unsubscribe();
+      }
     };
   }, [fetchPoints]);
 

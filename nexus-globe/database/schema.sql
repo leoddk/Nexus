@@ -76,3 +76,6 @@ $$ language 'plpgsql';
 CREATE TRIGGER update_nexus_points_updated_at 
     BEFORE UPDATE ON nexus_points 
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Enable real-time for the nexus_points table
+ALTER PUBLICATION supabase_realtime ADD TABLE nexus_points;

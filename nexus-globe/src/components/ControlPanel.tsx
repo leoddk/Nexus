@@ -86,7 +86,10 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ points, selectedPoint, onPo
   };
 
   const handleStatusChange = async (point: NexusPoint, newStatus: 'green' | 'yellow' | 'red') => { 
-    await updatePoint(point.id, { status: newStatus }); 
+    const result = await updatePoint(point.id, { status: newStatus });
+    if (result.error) {
+      console.error('Failed to update point status:', result.error);
+    }
   };
 
   const clearSearch = () => setSearchTerm('');
