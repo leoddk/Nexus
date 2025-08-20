@@ -117,7 +117,7 @@ export const useAuth = () => {
       console.log('Cleaning up auth subscription');
       subscription.unsubscribe();
     };
-  }, [fetchProfile]);
+  }, [fetchProfile]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const signIn = async (email: string, password: string) => {
     return await AuthService.signIn(email, password);
