@@ -2,6 +2,8 @@ import { supabase } from '../lib/supabase';
 import { Profile } from '../types';
 
 export class AuthService {
+  private static profileCache = new Map<string, { profile: Profile; timestamp: number }>();
+  private static CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
   static async signIn(email: string, password: string) {
     return await supabase.auth.signInWithPassword({ email, password });
   }
@@ -27,6 +29,13 @@ export class AuthService {
     try {
       console.log('AuthService: Starting profile fetch for userId:', userId);
       
+      // Check cache first
+      const cached = this.profileCache.get(userId);
+      if (cached && (Date.now() - cached.timestamp) < this.CACHE_DURATION) {
+        console.log('AuthService: Returning cached profile');
+        return cached.profile;
+      }
+      
       // Add timeout to prevent infinite hanging
       const profileQuery = supabase
         .from('profiles')
@@ -35,7 +44,7 @@ export class AuthService {
         .single();
 
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Profile fetch timeout')), 5000)
+        setTimeout(() => reject(new Error('Profile fetch timeout')), 10000)
       );
 
       const { data, error } = await Promise.race([profileQuery, timeoutPromise]) as any;
@@ -53,22 +62,31 @@ export class AuthService {
 
         console.log('AuthService: Profile creation result:', { newProfile, createError });
         if (createError) throw createError;
+        
+        // Cache the new profile
+        this.profileCache.set(userId, { profile: newProfile, timestamp: Date.now() });
         return newProfile;
       }
 
       if (error) throw error;
+      
+      // Cache the fetched profile
+      this.profileCache.set(userId, { profile: data, timestamp: Date.now() });
       return data;
     } catch (error) {
       console.error('Error fetching/creating profile:', error);
       // Return default profile if database isn't set up
       if (error instanceof Error && error.message === 'Profile fetch timeout') {
         console.warn('Profile fetch timed out, returning default profile');
-        return {
+        const defaultProfile = {
           id: userId,
           email: userEmail || 'unknown@example.com',
           role: 'viewer' as const,
           created_at: new Date().toISOString()
         };
+        // Cache the default profile temporarily
+        this.profileCache.set(userId, { profile: defaultProfile, timestamp: Date.now() });
+        return defaultProfile;
       }
       return null;
     }

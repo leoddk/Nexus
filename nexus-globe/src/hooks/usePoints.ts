@@ -40,23 +40,32 @@ export const usePoints = () => {
 
   const updatePoint = async (id: string, updates: Partial<NexusPoint>) => {
     try {
-      const updatedPoint = await PointsService.updatePoint(id, updates);
-      // Update local state immediately for better UX
+      // Update local state optimistically for immediate UI feedback
       setPoints(prev => {
-        console.log('Updating local state for point:', id, 'with updates:', updates);
-        const newPoints = [...prev]; // Create a new array
-        const index = newPoints.findIndex(p => p.id === id);
-        if (index !== -1) {
-          newPoints[index] = { ...updatedPoint }; // Create a new object
-        }
-        console.log('New points state after update:', newPoints.find(p => p.id === id));
+        console.log('Optimistically updating local state for point:', id, 'with updates:', updates);
+        const newPoints = prev.map(point => 
+          point.id === id ? { ...point, ...updates } : point
+        );
+        console.log('Optimistic update applied:', newPoints.find(p => p.id === id));
+        return newPoints;
+      });
+
+      const updatedPoint = await PointsService.updatePoint(id, updates);
+      
+      // Update with server response to ensure consistency
+      setPoints(prev => {
+        console.log('Updating with server response for point:', id);
+        const newPoints = prev.map(point => 
+          point.id === id ? { ...updatedPoint } : point
+        );
+        console.log('Server update applied:', newPoints.find(p => p.id === id));
         return newPoints;
       });
       
       return { data: updatedPoint, error: null };
     } catch (error: any) {
       console.error('Error updating point:', error);
-      // On error, refetch to ensure consistency
+      // On error, refetch to ensure consistency and revert optimistic update
       await fetchPoints(false);
       return { data: null, error };
     }
@@ -101,6 +110,7 @@ export const usePoints = () => {
             unsubscribe = PointsService.subscribeToChanges(() => {
               if (mounted) {
                 console.log('📡 Real-time callback triggered, refetching points...');
+                // Force a refresh to get latest data from server
                 fetchPoints(false);
               }
             });
@@ -124,6 +134,11 @@ export const usePoints = () => {
       }
     };
   }, [fetchPoints]);
+
+  // Log points state changes for debugging
+  useEffect(() => {
+    console.log('Points state changed:', points.length, 'points');
+  }, [points]);
 
   return { 
     points, 
